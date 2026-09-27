@@ -1,0 +1,377 @@
+# ============================================================
+# FACE RECOGNITION USING CNN
+# ============================================================
+
+# Install required packages
+!pip -q install scikit-learn seaborn
+
+# ------------------------------------------------------------
+# 1. Import Libraries
+# ------------------------------------------------------------
+
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.datasets import fetch_lfw_people
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, classification_report
+
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.layers import Flatten, Dense
+from tensorflow.keras.utils import to_categorical
+
+# ------------------------------------------------------------
+# 2. Load LFW Face Dataset
+# ------------------------------------------------------------
+
+lfw_people = fetch_lfw_people(
+    min_faces_per_person=100,
+    resize=1.0,
+    color=True
+)
+
+X = lfw_people.images
+y = lfw_people.target
+target_names = lfw_people.target_names
+
+print("Classes:")
+print(target_names)
+
+print("\nDataset shape:")
+print(X.shape)
+
+# ------------------------------------------------------------
+# 3. Resize Images to 128 x 128
+# ------------------------------------------------------------
+
+X_resized = np.zeros((len(X), 128, 128, 3), dtype=np.float32)
+
+for i in range(len(X)):
+    X_resized[i] = tf.image.resize(
+        X[i],
+        (128, 128)
+    ).numpy()
+
+X = X_resized
+
+# Normalize pixel values
+X = X / 255.0
+
+print("Final image shape:", X.shape)
+
+# ------------------------------------------------------------
+# 4. Display Sample Faces
+# ------------------------------------------------------------
+
+plt.figure(figsize=(12, 7))
+
+for i in range(min(18, len(X))):
+    plt.subplot(3, 6, i + 1)
+    plt.imshow(X[i])
+    plt.title(target_names[y[i]])
+    plt.axis("off")
+
+plt.tight_layout()
+plt.show()
+
+# ------------------------------------------------------------
+# 5. Display Number of Images for Each Person
+# ------------------------------------------------------------
+
+unique, counts = np.unique(y, return_counts=True)
+
+print("\nNumber of images for each person:")
+
+for label, count in zip(unique, counts):
+    print(target_names[label], ":", count)
+
+plt.figure(figsize=(8, 5))
+
+plt.bar(
+    [target_names[i] for i in unique],
+    counts
+)
+
+plt.xticks(rotation=90)
+plt.xlabel("Person")
+plt.ylabel("Number of Images")
+plt.title("Number of Images per Person")
+
+plt.show()
+
+# ------------------------------------------------------------
+# 6. Convert Labels
+# ------------------------------------------------------------
+
+num_classes = len(target_names)
+
+y_cat = to_categorical(
+    y,
+    num_classes=num_classes
+)
+
+# ------------------------------------------------------------
+# 7. Train-Test Split
+# ------------------------------------------------------------
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y_cat,
+    test_size=0.20,
+    random_state=42,
+    stratify=y
+)
+
+print("\nTraining data:", X_train.shape)
+print("Testing data :", X_test.shape)
+
+# ------------------------------------------------------------
+# 8. Create CNN Model
+# ------------------------------------------------------------
+
+model = Sequential()
+
+# First CNN layer
+model.add(
+    Conv2D(
+        32,
+        (3, 3),
+        activation="relu",
+        input_shape=(128, 128, 3)
+    )
+)
+
+model.add(
+    MaxPooling2D(
+        pool_size=(2, 2)
+    )
+)
+
+# Second CNN layer
+model.add(
+    Conv2D(
+        64,
+        (3, 3),
+        activation="relu"
+    )
+)
+
+model.add(
+    MaxPooling2D(
+        pool_size=(2, 2)
+    )
+)
+
+# Third CNN layer
+model.add(
+    Conv2D(
+        64,
+        (3, 3),
+        activation="relu"
+    )
+)
+
+model.add(
+    MaxPooling2D(
+        pool_size=(2, 2)
+    )
+)
+
+# Flatten
+model.add(Flatten())
+
+# Fully connected layer
+model.add(
+    Dense(
+        128,
+        activation="relu"
+    )
+)
+
+# Output layer
+model.add(
+    Dense(
+        num_classes,
+        activation="softmax"
+    )
+)
+
+# ------------------------------------------------------------
+# 9. Compile Model
+# ------------------------------------------------------------
+
+model.compile(
+    optimizer="adam",
+    loss="categorical_crossentropy",
+    metrics=["accuracy"]
+)
+
+# ------------------------------------------------------------
+# 10. Display Model Summary
+# ------------------------------------------------------------
+
+model.summary()
+
+# ------------------------------------------------------------
+# 11. Train the CNN
+# ------------------------------------------------------------
+
+history = model.fit(
+    X_train,
+    y_train,
+    epochs=20,
+    batch_size=64,
+    validation_split=0.20,
+    verbose=1
+)
+
+# ------------------------------------------------------------
+# 12. Evaluate Model
+# ------------------------------------------------------------
+
+test_loss, test_accuracy = model.evaluate(
+    X_test,
+    y_test,
+    verbose=1
+)
+
+print("\nTest Loss:", test_loss)
+print("Test Accuracy:", test_accuracy)
+
+# ------------------------------------------------------------
+# 13. Training and Validation Accuracy Graph
+# ------------------------------------------------------------
+
+plt.figure(figsize=(8, 5))
+
+plt.plot(
+    history.history["accuracy"],
+    label="Training Accuracy"
+)
+
+plt.plot(
+    history.history["val_accuracy"],
+    label="Validation Accuracy"
+)
+
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.title("Training and Validation Accuracy")
+
+plt.legend()
+plt.grid(True)
+
+plt.show()
+
+# ------------------------------------------------------------
+# 14. Make Predictions
+# ------------------------------------------------------------
+
+predictions = model.predict(X_test)
+
+predicted_labels = np.argmax(
+    predictions,
+    axis=1
+)
+
+actual_labels = np.argmax(
+    y_test,
+    axis=1
+)
+
+# ------------------------------------------------------------
+# 15. Confusion Matrix
+# ------------------------------------------------------------
+
+cm = confusion_matrix(
+    actual_labels,
+    predicted_labels
+)
+
+plt.figure(figsize=(8, 6))
+
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=target_names,
+    yticklabels=target_names
+)
+
+plt.xlabel("Predicted label")
+plt.ylabel("Actual label")
+plt.title("Confusion Matrix")
+
+plt.show()
+
+# ------------------------------------------------------------
+# 16. Classification Report
+# ------------------------------------------------------------
+
+print("\nClassification Report:\n")
+
+print(
+    classification_report(
+        actual_labels,
+        predicted_labels,
+        target_names=target_names
+    )
+)
+
+# ------------------------------------------------------------
+# 17. Predict a Face from Test Dataset
+# ------------------------------------------------------------
+
+index = 0
+
+image = X_test[index]
+
+plt.figure(figsize=(4, 4))
+plt.imshow(image)
+plt.axis("off")
+plt.show()
+
+# Predict
+prediction = model.predict(
+    np.expand_dims(image, axis=0)
+)
+
+predicted_class = np.argmax(prediction)
+
+print(
+    "\nPredicted Person:",
+    target_names[predicted_class]
+)
+
+print(
+    "Actual Person:",
+    target_names[actual_labels[index]]
+)
+
+# ------------------------------------------------------------
+# 18. Prediction Probability for All Classes
+# ------------------------------------------------------------
+
+print("\nPrediction probabilities:")
+
+for name, probability in zip(
+    target_names,
+    prediction[0]
+):
+    print(
+        f"{name}: {probability:.6f}"
+    )
+
+# ------------------------------------------------------------
+# RESULT
+# ------------------------------------------------------------
+
+print("\nResult:")
+print(
+    "Thus the Python program successfully "
+    "implemented Face Recognition using CNN."
+)
