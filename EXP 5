@@ -1,0 +1,122 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+print("Exp 5")
+print("ANUVARSHINI")
+print("814724243012")
+
+# -------------------------------------------------
+# 1. Training Data
+# -------------------------------------------------
+
+sentences = [
+    "this is a good movie",
+    "this movie is excellent",
+    "i love this movie",
+    "this is a bad movie",
+    "this movie is terrible",
+    "i hate this movie"
+]
+
+# 1 = Positive, 0 = Negative
+labels = np.array([1, 1, 1, 0, 0, 0])
+
+# -------------------------------------------------
+# 2. Tokenization
+# -------------------------------------------------
+
+tokenizer = Tokenizer(num_words=1000, oov_token="<OOV>")
+tokenizer.fit_on_texts(sentences)
+
+sequences = tokenizer.texts_to_sequences(sentences)
+
+# Make all sequences same length
+X = pad_sequences(
+    sequences,
+    maxlen=6,
+    padding="post"
+)
+
+# -------------------------------------------------
+# 3. Build Deep Learning Model
+# -------------------------------------------------
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Embedding(
+        input_dim=1000,
+        output_dim=16,
+        input_length=6
+    ),
+
+    tf.keras.layers.GlobalAveragePooling1D(),
+
+    tf.keras.layers.Dense(
+        16,
+        activation="relu"
+    ),
+
+    tf.keras.layers.Dense(
+        1,
+        activation="sigmoid"
+    )
+])
+
+# -------------------------------------------------
+# 4. Compile Model
+# -------------------------------------------------
+
+model.compile(
+    optimizer="adam",
+    loss="binary_crossentropy",
+    metrics=["accuracy"]
+)
+
+# -------------------------------------------------
+# 5. Train Model
+# -------------------------------------------------
+
+history = model.fit(
+    X,
+    labels,
+    epochs=10,
+    verbose=1
+)
+
+# -------------------------------------------------
+# 6. Test Sentences
+# -------------------------------------------------
+
+test_sentences = [
+    "This is a good movie.",
+    "I can't believe how bad this service is."
+]
+
+test_sequences = tokenizer.texts_to_sequences(test_sentences)
+
+test_X = pad_sequences(
+    test_sequences,
+    maxlen=6,
+    padding="post"
+)
+
+# -------------------------------------------------
+# 7. Prediction
+# -------------------------------------------------
+
+predictions = model.predict(test_X)
+
+# -------------------------------------------------
+# 8. Display Result
+# -------------------------------------------------
+
+for sentence, prediction in zip(test_sentences, predictions):
+
+    if prediction[0] >= 0.5:
+        sentiment = "positive sentiment"
+    else:
+        sentiment = "negative sentiment"
+
+    print(
+        f"'{sentence}' has a {sentiment}."
+    )
