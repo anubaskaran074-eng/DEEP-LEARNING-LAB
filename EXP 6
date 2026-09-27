@@ -1,0 +1,263 @@
+# ============================================================
+# PARTS OF SPEECH TAGGING USING SEQUENCE-TO-SEQUENCE
+# ============================================================
+
+import numpy as np
+import tensorflow as tf
+
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, LSTM, Dense
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+# ------------------------------------------------------------
+# 1. Training sentences
+# ------------------------------------------------------------
+
+sentences = [
+    "I am happy",
+    "She is beautiful",
+    "He plays cricket",
+    "They are students",
+    "The dog runs",
+    "The cat eats fish",
+    "We love Python",
+    "Python is powerful",
+    "This is a good book",
+    "The boy plays football",
+    "The girl reads books",
+    "Students learn programming"
+]
+
+# Corresponding POS tags
+tags = [
+    "PRON AUX ADJ",
+    "PRON AUX ADJ",
+    "PRON VERB NOUN",
+    "PRON AUX NOUN",
+    "DET NOUN VERB",
+    "DET NOUN VERB NOUN",
+    "PRON VERB NOUN",
+    "NOUN AUX ADJ",
+    "DET AUX DET ADJ NOUN",
+    "DET NOUN VERB NOUN",
+    "DET NOUN VERB NOUN",
+    "NOUN VERB NOUN"
+]
+
+# ------------------------------------------------------------
+# 2. Tokenize input sentences
+# ------------------------------------------------------------
+
+word_tokenizer = Tokenizer(
+    filters='',
+    lower=True
+)
+
+word_tokenizer.fit_on_texts(sentences)
+
+X = word_tokenizer.texts_to_sequences(sentences)
+
+# ------------------------------------------------------------
+# 3. Tokenize POS tags
+# ------------------------------------------------------------
+
+tag_tokenizer = Tokenizer(
+    filters='',
+    lower=False
+)
+
+tag_tokenizer.fit_on_texts(tags)
+
+Y = tag_tokenizer.texts_to_sequences(tags)
+
+# Maximum sentence length
+max_length = max(len(x) for x in X)
+
+# Padding
+X = pad_sequences(
+    X,
+    maxlen=max_length,
+    padding='post'
+)
+
+Y = pad_sequences(
+    Y,
+    maxlen=max_length,
+    padding='post'
+)
+
+# Number of words and tags
+num_words = len(word_tokenizer.word_index) + 1
+num_tags = len(tag_tokenizer.word_index) + 1
+
+print("Number of words:", num_words)
+print("Number of POS tags:", num_tags)
+
+# ------------------------------------------------------------
+# 4. Convert output to one-hot encoding
+# ------------------------------------------------------------
+
+Y = tf.keras.utils.to_categorical(
+    Y,
+    num_classes=num_tags
+)
+
+# ------------------------------------------------------------
+# 5. Encoder
+# ------------------------------------------------------------
+
+encoder_inputs = Input(
+    shape=(max_length,)
+)
+
+encoder_embedding = tf.keras.layers.Embedding(
+    num_words,
+    32
+)(encoder_inputs)
+
+encoder_lstm = LSTM(
+    64,
+    return_state=True
+)
+
+encoder_outputs, state_h, state_c = encoder_lstm(
+    encoder_embedding
+)
+
+encoder_states = [
+    state_h,
+    state_c
+]
+
+# ------------------------------------------------------------
+# 6. Decoder
+# ------------------------------------------------------------
+
+decoder_inputs = Input(
+    shape=(max_length,)
+)
+
+decoder_embedding_layer = tf.keras.layers.Embedding(
+    num_tags,
+    32
+)
+
+decoder_embedding = decoder_embedding_layer(
+    decoder_inputs
+)
+
+decoder_lstm = LSTM(
+    64,
+    return_sequences=True,
+    return_state=True
+)
+
+decoder_outputs, _, _ = decoder_lstm(
+    decoder_embedding,
+    initial_state=encoder_states
+)
+
+decoder_dense = Dense(
+    num_tags,
+    activation='softmax'
+)
+
+decoder_outputs = decoder_dense(
+    decoder_outputs
+)
+
+# ------------------------------------------------------------
+# 7. Create Seq2Seq Model
+# ------------------------------------------------------------
+
+model = Model(
+    [encoder_inputs, decoder_inputs],
+    decoder_outputs
+)
+
+# ------------------------------------------------------------
+# 8. Compile
+# ------------------------------------------------------------
+
+model.compile(
+    optimizer='adam',
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# ------------------------------------------------------------
+# 9. Train the model
+# ------------------------------------------------------------
+
+history = model.fit(
+    [X, X],
+    Y,
+    epochs=10,
+    batch_size=64,
+    verbose=1
+)
+
+# ------------------------------------------------------------
+# 10. Test sentence
+# ------------------------------------------------------------
+
+test_sentence = "Python is powerful"
+
+test_sequence = word_tokenizer.texts_to_sequences(
+    [test_sentence]
+)
+
+test_sequence = pad_sequences(
+    test_sequence,
+    maxlen=max_length,
+    padding='post'
+)
+
+# ------------------------------------------------------------
+# 11. Make prediction
+# ------------------------------------------------------------
+
+prediction = model.predict(
+    [test_sequence, test_sequence]
+)
+
+predicted_tags = np.argmax(
+    prediction[0],
+    axis=1
+)
+
+# ------------------------------------------------------------
+# 12. Convert predicted numbers to POS tags
+# ------------------------------------------------------------
+
+reverse_tag_index = {
+    value: key
+    for key, value in tag_tokenizer.word_index.items()
+}
+
+words = test_sentence.split()
+
+print("\nText:", test_sentence)
+print("Predicted Tags:")
+
+for i, word in enumerate(words):
+
+    tag_number = predicted_tags[i]
+
+    tag = reverse_tag_index.get(
+        tag_number,
+        "UNKNOWN"
+    )
+
+    print(word, "->", tag)
+
+# ------------------------------------------------------------
+# RESULT
+# ------------------------------------------------------------
+
+print("\nResult:")
+print(
+    "Thus the Python program is implemented successfully "
+    "for Parts of Speech Tagging using Sequence to Sequence architecture."
+)
